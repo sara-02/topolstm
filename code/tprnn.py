@@ -13,10 +13,10 @@ import downhill
 import metrics
 # import pdb
 import pprint
-
+import json
 import data_utils
 import tprnn_model
-
+import sys
 
 def numpy_floatX(data):
     return np.asarray(data, dtype=config.floatX)
@@ -96,7 +96,7 @@ def load_params(path, params):
     return params
 
 
-def evaluate(f_prob, test_loader, k_list=[10, 50, 100]):
+def evaluate(f_prob, test_loader, n_nodes, k_list=[10, 50, 100]):
     '''
     Evaluates trained model.
     '''
@@ -123,13 +123,14 @@ def evaluate(f_prob, test_loader, k_list=[10, 50, 100]):
             y = np.concatenate((y, y_), axis=0)
             y_prob = np.concatenate((y_prob, y_prob_), axis=0)
 
-    return metrics.portfolio(y_prob, y, k_list=k_list)
+    # return metrics.portfolio(y_prob, y, k_list=k_list)
+    return metrics.portfolio_icdm(y_prob, y, n_nodes)
 
 
 def train(data_dir='data/memes/',
           dim_proj=512,
           maxlen=30,
-          batch_size=256,
+          batch_size=64,
           keep_ratio=1.,
           shuffle_data=True,
           learning_rate=0.001,
@@ -149,9 +150,11 @@ def train(data_dir='data/memes/',
 
     # loads graph
     G, node_index = data_utils.load_graph(data_dir)
+    n_nodes = len(node_index)
+    # print("Nnodes", n_nodes)
     print nx.info(G)
     options['n_words'] = len(node_index)
-
+    sys.stdout.flush()
     print options
 
     # creates and initializes shared variables.
@@ -174,7 +177,7 @@ def train(data_dir='data/memes/',
                                              G=G)
     test_loader = data_utils.Loader(test_examples, options=options)
     print 'Loaded %d test examples' % len(test_examples)
-
+    sys.stdout.flush()
     if train:
         # prepares training data.
         print 'Loading train data...'
@@ -203,7 +206,7 @@ def train(data_dir='data/memes/',
 
         # training loop.
         start_time = timeit.default_timer()
-
+        sys.stdout.flush()
         # downhill.minimize(
         #     loss=cost,
         #     algo='adam',
@@ -230,7 +233,7 @@ def train(data_dir='data/memes/',
 
                 if global_step % disp_freq == 0:
                     print 'global step %d, cost: %f' % (global_step, cost)
-
+                    sys.stdout.flush()
                 # dump model parameters.
                 if global_step % save_freq == 0:
                     params = unzip(tparams)
@@ -239,15 +242,19 @@ def train(data_dir='data/memes/',
 
                 # evaluate on test data.
                 if global_step % test_freq == 0:
-                    scores = evaluate(model['f_prob'], test_loader)
-                    print 'eval scores: ', scores
+                    scores = evaluate(model['f_prob'], test_loader, n_nodes)
+                    print 'eval scores: ', scores['classification_report']
+                    
                     end_time = timeit.default_timer()
                     print 'time used: %d seconds.' % (end_time - start_time)
-
+                    sys.stdout.flush()
                 global_step += 1
 
-    scores = evaluate(model['f_prob'], test_loader)
-    pprint.pprint(scores)
+    scores = evaluate(model['f_prob'], test_loader, n_nodes)
+    pprint.pprint(scores['classification_report'])
+    sys.stdout.flush()
+    with open("test_data_scores.json","w") as f:
+        json.dump(scores,f,indent=True)
 
 
 if __name__ == '__main__':
