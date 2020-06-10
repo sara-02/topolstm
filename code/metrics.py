@@ -10,7 +10,6 @@ import collections
 # from sklearn.metrics import average_precision_score
 from sklearn.preprocessing import label_binarize
 from scipy.stats import rankdata
-from sklearn.metrics import f1_score, precision_score, recall_score, classification_report
 
 
 def _retype(y_prob, y):
@@ -119,7 +118,7 @@ def hits_k(y_prob, y, k=10):
 #     return sum(scores) / len(scores)
 
 
-def portfolio(y_prob, y, k_list=None):
+def portfolio(y_prob, y, k_list=[10, 50, 100]):
     y_prob, y = _retype(y_prob, y)
     # scores = {'auc': roc_auc(y_prob, y)}
     # scores = {'mean-rank:': mean_rank(y_prob, y)}
@@ -128,34 +127,4 @@ def portfolio(y_prob, y, k_list=None):
         scores['hits@' + str(k)] = hits_k(y_prob, y, k=k)
         scores['map@' + str(k)] = mapk(y_prob, y, k=k)
 
-    return scores
-
-
-def _flatten_scores(y_prob, y, n_nodes):
-    flatten_predict = []
-    flatten_actual = []
-    n_test = len(y)
-    for i in np.arange(n_test):
-        y_act = y[i]
-        max = np.argsort(y_prob[i])[-1:][0]
-        for j in np.arange(n_nodes):
-            if j == max:
-                flatten_predict.append(1)
-            else:
-                flatten_predict.append(0)
-            if j == y_act:
-                flatten_actual.append(1)
-            else:
-                flatten_actual.append(0)
-    return np.array(flatten_predict), np.array(flatten_actual)
-
-
-def portfolio_icdm(y_prob, y, n_nodes):
-    y_prob, y = _retype(y_prob, y)
-    predicted, actual = _flatten_scores(y_prob, y, n_nodes)
-    scores = {}
-    scores['precision'] = precision_score(actual, predicted)
-    scores['recall'] = recall_score(actual, predicted)
-    scores['f1'] = f1_score(actual, predicted)
-    scores['classification_report'] = classification_report(actual, predicted)
     return scores

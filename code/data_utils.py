@@ -15,12 +15,12 @@ from theano import config
 def load_graph(data_dir):
     # loads nodes observed in any cascade.
     node_file = os.path.join(data_dir, 'seen_nodes.txt')
-    with open(node_file, 'rb') as f:
+    with open(node_file, 'r') as f:
         seen_nodes = [x.strip() for x in f]
-
+    print(len(seen_nodes))
     # builds node index
     node_index = {v: i for i, v in enumerate(seen_nodes)}
-
+    print(len(node_index))
     # loads graph
     graph_file = os.path.join(data_dir, 'graph.txt')
     pkl_file = os.path.join(data_dir, 'graph.pkl')
@@ -32,7 +32,7 @@ def load_graph(data_dir):
         G.name = data_dir
         n_nodes = len(node_index)
         G.add_nodes_from(range(n_nodes))
-        with open(graph_file, 'rb') as f:
+        with open(graph_file, 'r') as f:
             f.next()
             for line in f:
                 u, v = line.strip().split()
@@ -113,7 +113,7 @@ def load_examples(data_dir,
         # loads cascades
         filename = os.path.join(data_dir, dataset + '.txt')
         examples = []
-        with codecs.open(filename, 'r', encoding='utf-8') as input_file:
+        with codecs.open(filename, 'r') as input_file:
             for line_index, line in enumerate(input_file):
                 # parses the input line.
                 query, cascade = line.strip().split(' ', 1)
