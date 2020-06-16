@@ -222,7 +222,7 @@ def train(data_dir='data/twitter/',
         n_examples = len(train_examples)
         batches_per_epoch = n_examples // options['batch_size'] + 1
 #         n_epochs = global_steps // batches_per_epoch + 1
-        n_epochs = 10
+        n_epochs = 5
         global_step = 0
         cost_history = []
         for _ in range(n_epochs):
@@ -250,9 +250,16 @@ def train(data_dir='data/twitter/',
                 global_step += 1
 
     scores = evaluate(model['f_prob'], test_loader, k_list=[1,5,10,20,50,100],test_batch=True)
+    scores["batch_size"] = batch_size
+    scores["global_steps"] = global_steps
+    scores["disp_freq"] = disp_freq
+    scores["save_freq"] = save_freq
+    scores["test_freq"] = test_freq
+    scores["n_epochs"] = n_epochs
     print scores
+    
     sys.stdout.flush()
-    with open("test_data_scores_final_n10.json","w") as f:
+    with open("test_data_scores_final.json","w") as f:
         json.dump(scores,f,indent=True)
 
 
