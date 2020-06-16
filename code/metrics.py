@@ -10,6 +10,7 @@ import collections
 # from sklearn.metrics import average_precision_score
 from sklearn.preprocessing import label_binarize
 from scipy.stats import rankdata
+from scipy import stats
 
 
 def _retype(y_prob, y):
@@ -116,9 +117,17 @@ def hits_k(y_prob, y, k=10):
 #         print p_, y_
 
 #     return sum(scores) / len(scores)
+def _flatten_y(y_ori, y_len):
+    y_flat = []
+    for i in range(y_len):
+        if i==y_ori:
+            y_flat.append(1)
+        else:
+            y_flat.append(0)
+    y_flat = np.array(y_flat)
+    return y_flat
 
-
-def portfolio(y_prob, y, k_list=[10, 50, 100]):
+def portfolio(y_prob, y, k_list=[10, 50, 100], test_batch=False):
     y_prob, y = _retype(y_prob, y)
     # scores = {'auc': roc_auc(y_prob, y)}
     # scores = {'mean-rank:': mean_rank(y_prob, y)}
@@ -126,5 +135,15 @@ def portfolio(y_prob, y, k_list=[10, 50, 100]):
     for k in k_list:
         scores['hits@' + str(k)] = hits_k(y_prob, y, k=k)
         scores['map@' + str(k)] = mapk(y_prob, y, k=k)
-
+    if test_batch:
+        num_test, y_len = y_prob.shape
+        print(num_test, y_len)
+        tau = 0.0
+        row= 0.0
+        for i in range(num_test):
+            y_flat = _flatten_y(y[i],y_len)
+            tau += stats.kendalltau(y_prob[i],y_flat)[0]
+            row += stats.spearmanr(y_prob[i],y_flat)[0]
+        scores['tau'] = tau/num_test
+        scores['row'] = row/num_test
     return scores

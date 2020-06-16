@@ -96,7 +96,7 @@ def load_params(path, params):
     return params
 
 
-def evaluate(f_prob, test_loader, n_nodes, k_list=[10, 50, 100]):
+def evaluate(f_prob, test_loader, k_list=[10, 50, 100], test_batch=False):
     '''
     Evaluates trained model.
     '''
@@ -123,8 +123,7 @@ def evaluate(f_prob, test_loader, n_nodes, k_list=[10, 50, 100]):
             y = np.concatenate((y, y_), axis=0)
             y_prob = np.concatenate((y_prob, y_prob_), axis=0)
 
-    return metrics.portfolio(y_prob, y, k_list=k_list)
-#     return metrics.portfolio_icdm(y_prob, y, n_nodes)
+    return metrics.portfolio(y_prob, y, k_list=k_list, test_batch=test_batch)
 
 
 def train(data_dir='data/twitter/',
@@ -134,10 +133,10 @@ def train(data_dir='data/twitter/',
           keep_ratio=1.,
           shuffle_data=True,
           learning_rate=0.001,
-          global_steps=5000,
+          global_steps=1000,
           disp_freq=100,
-          save_freq=1000,
-          test_freq=1000,
+          save_freq=100,
+          test_freq=100,
           saveto_file='params.npz',
           weight_decay=0.0005,
           reload_model=False,
@@ -150,7 +149,7 @@ def train(data_dir='data/twitter/',
 
     # loads graph
     G, node_index = data_utils.load_graph(data_dir)
-    n_nodes = len(node_index)
+#     n_nodes = len(node_index)
     # print("Nnodes", n_nodes)
     print nx.info(G)
     options['n_words'] = len(node_index)
@@ -222,8 +221,8 @@ def train(data_dir='data/twitter/',
 
         n_examples = len(train_examples)
         batches_per_epoch = n_examples // options['batch_size'] + 1
-        n_epochs = global_steps // batches_per_epoch + 1
-        #n_epochs = 5
+#         n_epochs = global_steps // batches_per_epoch + 1
+        n_epochs = 10
         global_step = 0
         cost_history = []
         for _ in range(n_epochs):
@@ -242,7 +241,7 @@ def train(data_dir='data/twitter/',
 
                 # evaluate on test data.
                 if global_step % test_freq == 0:
-                    scores = evaluate(model['f_prob'], test_loader, n_nodes)
+                    scores = evaluate(model['f_prob'], test_loader)
                     print 'eval scores: '
                     print scores
                     end_time = timeit.default_timer()
@@ -250,10 +249,10 @@ def train(data_dir='data/twitter/',
                     sys.stdout.flush()
                 global_step += 1
 
-    scores = evaluate(model['f_prob'], test_loader, n_nodes)
+    scores = evaluate(model['f_prob'], test_loader, k_list=[1,5,10,20,50,100],test_batch=True)
     print scores
     sys.stdout.flush()
-    with open("test_data_scores.json","w") as f:
+    with open("test_data_scores_final_n10.json","w") as f:
         json.dump(scores,f,indent=True)
 
 
