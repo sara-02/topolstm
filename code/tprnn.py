@@ -101,12 +101,25 @@ def evaluate(f_prob, test_loader, k_list=[10, 50, 100], test_batch=False):
     Evaluates trained model.
     '''
     n_batches = len(test_loader)
+    print("n_batches---",n_batches)
     y = None
     y_prob = None
+    y_hate = None
     for _ in range(n_batches):
         batch_data = test_loader()
         y_ = batch_data[-1]
-        y_prob_ = f_prob(*batch_data[:-1])
+#         print y_
+#         print y_h_
+#         print len(y_)
+#         print len(y_h_)
+#         print type(y_)
+#         print type(y_h_)
+#         if test_batch:
+        y_prob_ = f_prob(*batch_data[:-2])
+        y_h_ = batch_data[-2]
+#         else:
+#             y_prob_ = f_prob(*batch_data[:-1])
+#             y_h_=None 
 
         # excludes activated nodes when predicting.
         for i, p in enumerate(y_prob_):
@@ -119,11 +132,16 @@ def evaluate(f_prob, test_loader, k_list=[10, 50, 100], test_batch=False):
         if y_prob is None:
             y_prob = y_prob_
             y = y_
+            y_hate = y_h_
+#         if y_prob is None and test_batch:
+#             y_hate = y_h_
         else:
             y = np.concatenate((y, y_), axis=0)
             y_prob = np.concatenate((y_prob, y_prob_), axis=0)
+#             if test_batch:
+            y_hate = np.concatenate((y_hate, y_h_),axis=0)
 
-    return metrics.portfolio(y_prob, y, k_list=k_list, test_batch=test_batch)
+    return metrics.portfolio(y_prob, y, y_hate, k_list=k_list, test_batch=test_batch)
 
 
 def train(data_dir='data/twitter/',
@@ -133,10 +151,10 @@ def train(data_dir='data/twitter/',
           keep_ratio=1.,
           shuffle_data=True,
           learning_rate=0.001,
-          global_steps=1000,
-          disp_freq=100,
-          save_freq=100,
-          test_freq=100,
+          global_steps=10,
+          disp_freq=50,
+          save_freq=50,
+          test_freq=50,
           saveto_file='params.npz',
           weight_decay=0.0005,
           reload_model=False,
@@ -148,7 +166,8 @@ def train(data_dir='data/twitter/',
     saveto = data_dir + saveto_file
 
     # loads graph
-    G, node_index = data_utils.load_graph(data_dir)
+    G, node_index, hate_labels = data_utils.load_graph(data_dir)
+#     print(hate_labels)
 #     n_nodes = len(node_index)
     # print("Nnodes", n_nodes)
     print nx.info(G)
@@ -173,8 +192,10 @@ def train(data_dir='data/twitter/',
                                              dataset='test',
                                              node_index=node_index,
                                              maxlen=maxlen,
+                                             hate_labels=hate_labels,
                                              G=G)
-    test_loader = data_utils.Loader(test_examples, options=options)
+#     print test_examples
+    test_loader = data_utils.Loader(test_examples, hate=True, options=options)
     print 'Loaded %d test examples' % len(test_examples)
     sys.stdout.flush()
     if train:
@@ -186,8 +207,9 @@ def train(data_dir='data/twitter/',
                                                       'keep_ratio'],
                                                   node_index=node_index,
                                                   maxlen=maxlen,
+                                                  hate_labels=None,
                                                   G=G)
-        train_loader = data_utils.Loader(train_examples, options=options)
+        train_loader = data_utils.Loader(train_examples, hate=False, options=options)
         print 'Loaded %d training examples.' % len(train_examples)
 
         # compiles updates.
@@ -222,7 +244,7 @@ def train(data_dir='data/twitter/',
         n_examples = len(train_examples)
         batches_per_epoch = n_examples // options['batch_size'] + 1
 #         n_epochs = global_steps // batches_per_epoch + 1
-        n_epochs = 5
+        n_epochs = 10
         global_step = 0
         cost_history = []
         for _ in range(n_epochs):
@@ -259,7 +281,7 @@ def train(data_dir='data/twitter/',
     print scores
     
     sys.stdout.flush()
-    with open("test_data_scores_final.json","w") as f:
+    with open("test_data_scores_h_nh.json","w") as f:
         json.dump(scores,f,indent=True)
 
 

@@ -21,6 +21,13 @@ def load_graph(data_dir):
     # builds node index
     node_index = {v: i for i, v in enumerate(seen_nodes)}
     print(len(node_index))
+    
+    # load hate_test_ids
+    hate_path = os.path.join(data_dir, 'hate_test.txt')
+    with open(hate_path, 'r') as f:
+        hate_labels = [int(x.strip()) for x in f]
+    print("HATE",len(hate_labels))
+    
     # loads graph
     graph_file = os.path.join(data_dir, 'graph.txt')
     pkl_file = os.path.join(data_dir, 'graph.pkl')
@@ -42,11 +49,12 @@ def load_graph(data_dir):
                     G.add_edge(u, v)
         pickle.dump(G, open(pkl_file, 'wb'))
 
-    return G, node_index
+    return G, node_index, hate_labels
 
 
 def convert_cascade_to_examples(sequence,
                                 G=None,
+                                hate_symbol=None,
                                 inference=False):
     length = len(sequence)
 
@@ -83,11 +91,19 @@ def convert_cascade_to_examples(sequence,
             label = sequence[i + 1]
         else:
             label = None
-
-        example = {'sequence': prefix,
-                   'topo_mask': topo_mask,
-                   'label': label}
-
+        if hate_symbol is not None:
+            example = {'sequence': prefix,
+                       'topo_mask': topo_mask,
+                       'hate_symbol': hate_symbol,
+                       'label': label,
+                      }
+#             if i%100==0:
+#                 print(example)
+        else:
+              example = {'sequence': prefix,
+                       'topo_mask': topo_mask,
+                       'label': label
+                      }
         if not inference:
             examples.append(example)
         else:
@@ -99,6 +115,7 @@ def load_examples(data_dir,
                   G=None,
                   node_index=None,
                   maxlen=None,
+                  hate_labels=None,
                   keep_ratio=1.):
     """
     Load the train/dev/test data
@@ -121,8 +138,14 @@ def load_examples(data_dir,
                 if maxlen is not None:
                     sequence = sequence[:maxlen]
                 sequence = [node_index[x] for x in sequence]
-
-                sub_examples = convert_cascade_to_examples(sequence, G=G)
+                if hate_labels is not None:
+                    hate_symbol=hate_labels[line_index]
+#                     print hate_symbol
+                else:
+                    hate_symbol=None
+                sub_examples = convert_cascade_to_examples(sequence, G=G, hate_symbol=hate_symbol)
+#                 if line_index%600==0:
+#                     print sub_examples
                 examples.extend(sub_examples)
 
         pickle.dump(examples, open(pkl_path, 'wb'))
@@ -134,7 +157,7 @@ def load_examples(data_dir,
     return sampled_examples
 
 
-def prepare_minibatch(tuples, inference=False, options=None):
+def prepare_minibatch(tuples, inference=False, hate=False, options=None):
     '''
     produces a mini-batch of data in format required by model.
     '''
@@ -167,14 +190,25 @@ def prepare_minibatch(tuples, inference=False, options=None):
     else:
         labels_vector = None
 
-    return (seqs_matrix,
-            seq_masks_matrix,
-            topo_masks_tensor,
-            labels_vector)
+    if hate:
+        hate_labels = [t['hate_symbol'] for t in tuples]
+        hate_vector = np.array(hate_labels).astype('int32')
+    
+    if hate:
+        return (seqs_matrix,
+                seq_masks_matrix,
+                topo_masks_tensor,
+                hate_vector,
+                labels_vector)
+    else:
+        return (seqs_matrix,
+                seq_masks_matrix,
+                topo_masks_tensor,
+                labels_vector)
 
-
+    
 class Loader:
-    def __init__(self, data, options=None):
+    def __init__(self, data, hate=False, options=None):
         self.batch_size = options['batch_size']
         self.idx = 0
         self.data = data
@@ -183,6 +217,7 @@ class Loader:
         self.n_words = options['n_words']
         self.indices = np.arange(self.n, dtype="int32")
         self.options = options
+        self.hate=hate
 
     def __len__(self):
         return len(self.data) // self.batch_size + 1
@@ -193,11 +228,11 @@ class Loader:
 
         batch_indices = self.indices[self.idx: self.idx + self.batch_size]
         batch_examples = [self.data[i] for i in batch_indices]
-
+#         print batch_examples    
         self.idx += self.batch_size
         if self.idx >= self.n:
             self.idx = 0
 
         return prepare_minibatch(batch_examples,
-                                 inference=False,
+                                 inference=False, hate=self.hate,
                                  options=self.options)
